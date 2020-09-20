@@ -19,7 +19,7 @@ int toggle_state(int toggle) {
     if (count>20) { //2초후 빛이 꺼짐.
       toggle = 0 ;
     }
-    elif (count<10) {
+    else if (count<10) {
       toggle = 1 ; //카운트의 초반 10회(1초)간  불을 켜둠
       }
     else{
