@@ -16,11 +16,14 @@ void loop() {
 }
 
 int toggle_state(int toggle) {
-    if (count%20<10) {
+    if (count>20) { //2초후 빛이 꺼짐.
+      toggle = 0 ;
+    }
+    elif (count<10) {
       toggle = 1 ; //카운트의 초반 10회(1초)간  불을 켜둠
       }
     else{
-      toggle = count%2;//count의 홀 짝 기준으로 0,1 반복 출력으로 깜빡임
+      toggle = count%2;//1초 이후에 count의 홀 짝 기준으로 0,1 반복 출력으로 깜빡임
     }
     
     return toggle ;
