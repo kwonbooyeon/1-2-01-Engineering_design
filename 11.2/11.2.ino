@@ -9,14 +9,16 @@ int analogPin =0;
 
 // configurable parameters
 #define SND_VEL 346.0 // sound velocity at 24 celsius degree (unit: m/s)
-#define INTERVAL 5 // sampling interval (unit: ms)
+#define INTERVAL 25 // sampling interval (unit: ms)
 #define _DIST_MIN 100 // minimum distance to be measured (unit: mm)
 #define _DIST_MAX 400 // maximum distance to be measured (unit: mm)
 #define _DIST_ALPHA 0.1 // EMA weight of new sample (range: 0 to 1). Setting this value to 1 effectively disables EMA filter.
 
-#define _DUTY_MIN 1300 // servo full clockwise position (0 degree)
-#define _DUTY_NEU 1500// servo neutral position (90 degree)
-#define _DUTY_MAX 1800 // servo full counterclockwise position (180 degree)
+#define _DUTY_MIN 1300// servo full clockwise position (0 degree)
+#define _DUTY_NEU 1470 // servo neutral position (90 degree)
+#define _DUTY_MAX 1700 // servo full counterclockwise position (180 degree)
+
+#define _SERVO_SPEED 100 // servo speed limit (unit: degree/second)
 
 // global variables
 float timeout; // unit: us
@@ -26,8 +28,12 @@ float lastEMA=0.0;
 bool ballclosing;
 unsigned long last_sampling_time; // unit: ms
 float scale; // used for pulse duration to distance conversion
+//------------
+int duty_chg_per_interval; // maximum duty difference per interval
+float pause_time; // unit: sec
 Servo myservo;
-
+int duty_target, duty_curr;
+//-----------
 float reading;
 
 void setup() {
@@ -38,6 +44,7 @@ void setup() {
   pinMode(PIN_ECHO,INPUT);
 
   myservo.attach(PIN_SERVO); 
+  duty_target = duty_curr = _DUTY_NEU;
   myservo.writeMicroseconds(_DUTY_NEU);
 
 // initialize USS related variables
@@ -51,6 +58,10 @@ void setup() {
 // initialize serial port
   Serial.begin(57600);
 
+// convert angle speed into duty change per interval.
+  duty_chg_per_interval = (float)(_DUTY_MAX - _DUTY_MIN) * _SERVO_SPEED / 180 * INTERVAL / 1000;
+ 
+  
 // initialize last sampling time
   last_sampling_time = 0;
 }
@@ -65,16 +76,17 @@ void loop() {
   dist_ema = alpha*dist_raw+(1-alpha)*dist_ema;
   
 // output the read value to the serial port
-  Serial.print("Min:100,raw:");
-  Serial.print(dist_raw);
-  Serial.print(",ema:");
+  Serial.print("dist_ir:");
   Serial.print(dist_ema);
-  Serial.print(",servo:");
-  Serial.print(myservo.read());
-  Serial.print(",val:");
-  Serial.print(ir_distance());
-  Serial.println(",Max:400");
+  Serial.print(",duty_target:");
+  Serial.print(map(duty_target,1000,2000,410,510));
+  Serial.print(",duty_curr:");
+  Serial.print(map(duty_curr,1000,2000,410,510));
+  Serial.println(",Min:100,Low:200,dist_target:255,High:310,Max:410");
 
+  
+
+//target 설정
 // adjust servo position according to the USS read value
 /*//공이 굴러가는 방향따라 각도바뀌는 지점을 바꾸려고 했으나 결과가 좋지 못함.
   if(lastEMA - dist_ema >= 0)ballclosing = true;
@@ -85,19 +97,29 @@ void loop() {
   int pointTerm = 10;
 //  Serial.println((dist_raw-180)/(360-180)*((_DUTY_MAX-_DUTY_MIN)/100));
   if (point+pointTerm<=dist_ema){
-    myservo.writeMicroseconds(_DUTY_NEU-(dist_ema-(point+pointTerm))*(_DUTY_NEU-_DUTY_MIN)/(300-(point+pointTerm)));
+    duty_target = _DUTY_NEU-(dist_ema-(point+pointTerm))*(_DUTY_NEU-_DUTY_MIN)/(300-(point+pointTerm));
     //myservo.writeMicroseconds(_DUTY_MIN);
   }else if(point-pointTerm>dist_ema){
-   myservo.writeMicroseconds(_DUTY_NEU-(dist_ema-(point-pointTerm))*(_DUTY_MAX-_DUTY_NEU)/(point-pointTerm));
+    duty_target = _DUTY_NEU-(dist_ema-(point-pointTerm))*(_DUTY_MAX-_DUTY_NEU)/(point-pointTerm);
     //myservo.writeMicroseconds(_DUTY_MAX);
   }// add your code here!  
- /* 
- if (dist_ema<200){
-  myservo.writeMicroseconds(_DUTY_MAX);
+
+  
+//현재 움직임
+// adjust duty_curr toward duty_target by duty_chg_per_interval
+  if(duty_target > duty_curr) {
+    duty_curr += duty_chg_per_interval;
+    if(duty_curr > duty_target) duty_curr = duty_target;
   }
-  else{
-  myservo.writeMicroseconds(_DUTY_MIN);
-  }// add your code here!  */
+  else {
+    duty_curr -= duty_chg_per_interval;
+    if(duty_curr < duty_target) duty_curr = duty_target;
+  }
+
+// update servo position
+  myservo.writeMicroseconds(duty_curr);
+
+
 // update last sampling time
   last_sampling_time += INTERVAL;
 
