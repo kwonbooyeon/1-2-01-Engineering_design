@@ -16,14 +16,19 @@ int analogPin =0;
 #define _DIST_MAX 400 // maximum distance to be measured (unit: mm)
 #define _DIST_ALPHA 0.1 // EMA weight of new sample (range: 0 to 1). Setting this value to 1 effectively disables EMA filter.
 
-#define _DUTY_MIN 1370//1440// servo full clockwise position (0 degree)
-#define _DUTY_NEU 1470 // servo neutral position (90 degree)
+#define _DUTY_MIN 1270//1440// servo full clockwise position (0 degree)
+#define _DUTY_NEU 1440 // servo neutral position (90 degree)
 #define _DUTY_MAX 1640//1600 // servo full counterclockwise position (180 degree)
-
-#define _SERVO_SPEED 500 // servo speed limit (unit: degree/second)
-
-#define _KD 50.0
-#define _KP 0.5
+/*
+#define _DUTY_MIN 1300//1440// servo full clockwise position (0 degree)
+#define _DUTY_NEU 1440 // servo neutral position (90 degree)
+#define _DUTY_MAX 1590//1600 // servo full counterclockwise position (180 degree)
+*/
+#define _SERVO_SPEED 500 // servo speed limit (unit: degree/second)75 0.5
+  
+#define _KD 85.0
+#define _KP 0.08
+#define _KI 0.005
 // global variables
 float timeout; // unit: us
 float dist_min, dist_max, dist_raw,dist_ema, dist_prev ,alpha ,dist_target; // unit: mm
@@ -92,18 +97,21 @@ void loop() {
   dist_ema = alpha*dist_raw+(1-alpha)*dist_ema;
   
 // output the read value to the serial port
-  Serial.print("dist_ir:");
+  Serial.print("IR:");
   Serial.print(dist_ema);
-  Serial.print(",pterm:");
+  Serial.print(",T:");
+  Serial.print(dist_target);
+  Serial.print(",P:");
   Serial.print(map(pterm,-1000,1000,510,610));
-  Serial.print(",dterm:");
+  Serial.print(",D:");
   Serial.print(map(dterm,-1000,1000,510,610));
-  Serial.print(",duty_target:");
+  Serial.print(",I:");
+  Serial.print(map(iterm,-1000,1000,510,610));
+  Serial.print(",DTT:");
   Serial.print(map(duty_target,1000,2000,410,510));
-  Serial.print(",duty_curr:");
+  Serial.print(",DTC:");
   Serial.print(map(duty_curr,1000,2000,410,510));
-  Serial.println(",Min:100,Low:200,dist_target:255,High:310,Max:410");
-  
+  Serial.println(",-G:245,+G:265,m:0,M:800");
 
 //target 설정
 /*error_curr = dist_target - dist_ema; 
@@ -131,7 +139,8 @@ void loop() {
 error_curr = dist_target - dist_ema; 
 pterm = _KP * error_curr;
 dterm = _KD * (error_curr - error_prev);
-control = (dterm + pterm);
+iterm += _KI * error_curr;
+control = (dterm + pterm + iterm);
 
 if (control > 0) control = control * ( _DUTY_MAX-_DUTY_NEU)/(dist_target);//(400-dist_target);
 else control = control * (_DUTY_NEU - _DUTY_MIN)/(300-dist_target);//dist_target;
